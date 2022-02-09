@@ -1,0 +1,27 @@
+import React from 'react';
+import ReactDOM from 'react-dom';
+import './index.css';
+import App from './App';
+import reportWebVitals from './reportWebVitals';
+import { ChakraProvider } from '@chakra-ui/react';
+import { QueryClient, QueryClientProvider } from 'react-query';
+import theme from './theme';
+
+// Create a client that manages access to server (remote) state.
+// The client contains all of the cached data that is associated with
+// the server.
+const queryClient = new QueryClient();
+
+ReactDOM.render(
+    <QueryClientProvider client={queryClient}>
+        <ChakraProvider theme={theme}>
+            <App />
+        </ChakraProvider>
+    </QueryClientProvider>,
+    document.getElementById('root'),
+);
+
+// If you want to start measuring performance in your app, pass a function
+// to log results (for example: reportWebVitals(console.log))
+// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
+reportWebVitals();
