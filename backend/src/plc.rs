@@ -1,11 +1,11 @@
-use sysinfo::{Pid, ProcessExt, System, SystemExt};
-use std::sync::{Arc, RwLock};
-use std::process::Command;
-use std::time::{Duration, Instant};
-use tokio::io::{BufReader, AsyncBufReadExt};
-use tokio::process::Command as TokioCommand;
-use std::process::{Stdio};
 use std::fmt;
+use std::process::Command;
+use std::process::Stdio;
+use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant};
+use sysinfo::{Pid, ProcessExt, System, SystemExt};
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::process::Command as TokioCommand;
 
 // The PLC is in one of the follow stated (where we start in
 // Initialize which can directly transition to any one of the
@@ -31,45 +31,45 @@ use std::fmt;
 fn plc_start_command() -> &'static str {
     let command = if cfg!(unix) {
         "openplc"
-      } else if cfg!(windows) {
+    } else if cfg!(windows) {
         "startplc.bat"
-      } else {
+    } else {
         "unknown"
-      };
-      command
+    };
+    command
 }
 
 fn plc_process_name() -> &'static str {
     let process = if cfg!(unix) {
         "openplc"
-      } else if cfg!(windows) {
+    } else if cfg!(windows) {
         "openplc.exe"
-      } else {
+    } else {
         "unknown"
-      };
-      process
+    };
+    process
 }
 
 fn plc_compile_command() -> &'static str {
     let command = if cfg!(unix) {
         "compile"
-      } else if cfg!(windows) {
+    } else if cfg!(windows) {
         "compile.bat"
-      } else {
+    } else {
         "unknown"
-      };
-      command
+    };
+    command
 }
 
 fn plc_change_hardware_command() -> &'static str {
     let command = if cfg!(unix) {
         "change_hardware_layer.sh"
-      } else if cfg!(windows) {
+    } else if cfg!(windows) {
         "change_hardware_layer.bat"
-      } else {
+    } else {
         "unknown"
-      };
-      command
+    };
+    command
 }
 
 type StateResult<T = PlcState, E = String> = std::result::Result<T, E>;
@@ -89,13 +89,13 @@ pub enum PlcState {
 
 impl fmt::Display for PlcState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-       match &*self {
-           PlcState::Initialize => write!(f, "State: Initialize"),
-           PlcState::Stopped => write!(f, "State: Stopped"),
-           PlcState::Stopping(pid) => write!(f, "State: Stopping {}", pid),
-           PlcState::Running(pid) => write!(f, "State: Running {}", pid),
-           PlcState::Compiling(pid) => write!(f, "State: Compiling {}", pid),
-       }
+        match &*self {
+            PlcState::Initialize => write!(f, "State: Initialize"),
+            PlcState::Stopped => write!(f, "State: Stopped"),
+            PlcState::Stopping(pid) => write!(f, "State: Stopping {}", pid),
+            PlcState::Running(pid) => write!(f, "State: Running {}", pid),
+            PlcState::Compiling(pid) => write!(f, "State: Compiling {}", pid),
+        }
     }
 }
 
@@ -117,20 +117,20 @@ pub enum PlcEvent {
 
 impl fmt::Display for PlcEvent {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-       match &*self {
-           PlcEvent::NoOp => write!(f, "Event: NoOp"),
-           PlcEvent::Compile(file) => write!(f, "Event: Compile {}", &file),
-           PlcEvent::SetHardware(name) => write!(f, "Event: Set Hardware {}", &name),
-           PlcEvent::Run(file) => write!(f, "Event: Run {}", &file),
-           PlcEvent::Stop => write!(f, "Event: Stop"),
-       }
+        match &*self {
+            PlcEvent::NoOp => write!(f, "Event: NoOp"),
+            PlcEvent::Compile(file) => write!(f, "Event: Compile {}", &file),
+            PlcEvent::SetHardware(name) => write!(f, "Event: Set Hardware {}", &name),
+            PlcEvent::Run(file) => write!(f, "Event: Run {}", &file),
+            PlcEvent::Stop => write!(f, "Event: Stop"),
+        }
     }
 }
 
 impl PlcState {
     pub fn next(self, event: PlcEvent) -> StateResult {
-        use self::PlcState::*;
         use self::PlcEvent::*;
+        use self::PlcState::*;
 
         // Match the current state and the event. Many transitions are
         // only valid while stopped.
@@ -144,9 +144,9 @@ impl PlcState {
             (Stopped, SetHardware(name)) => change_hardware(name),
             (Stopped, Run(file)) => start_program(file),
 
-            (Compiling(pid), NoOp) =>  is_proc_running(pid),
+            (Compiling(pid), NoOp) => is_proc_running(pid),
             (Compiling(pid), Stop) => stop_proc(pid),
-            
+
             (Running(pid), NoOp) => is_proc_running(pid),
             (Running(pid), Stop) => stop_proc(pid),
 
@@ -155,7 +155,10 @@ impl PlcState {
 
             // Catch-all for other transitions. These transitions
             // are not valid so we stay in our current state.
-            (state, event) => Err(format!("Invalid transition: event {} not valid in {}", event, state)),
+            (state, event) => Err(format!(
+                "Invalid transition: event {} not valid in {}",
+                event, state
+            )),
         }
     }
 }
@@ -172,15 +175,15 @@ impl PlcStateMachine {
     // beings in the initialize state (which implies unknown state).
     // As an example, the state is unknown because the PLC can run without
     // the web server.
-     fn new() -> Self {
+    fn new() -> Self {
         PlcStateMachine {
-            state: PlcState::Initialize
+            state: PlcState::Initialize,
         }
     }
 
     // Receives events that can cause the PLD to transition to another state.
     // Events might originate from and event pump or based on a particular
-    // request. 
+    // request.
     pub fn run(&mut self, event: PlcEvent) -> StateResult {
         println!("{}", event);
         let result = self.state.next(event);
@@ -188,7 +191,7 @@ impl PlcStateMachine {
             Ok(state) => {
                 self.state = state;
                 return Ok(self.state);
-            },
+            }
             Err(msg) => {
                 return Err(msg);
             }
@@ -212,7 +215,7 @@ fn is_proc_running(pid: Pid) -> StateResult {
     use self::PlcState::*;
     let s = System::new_all();
     if let Some(process) = s.process(pid) {
-        return Ok(Running(pid))
+        return Ok(Running(pid));
     }
     Ok(Stopped)
 }
@@ -231,17 +234,11 @@ fn start_program(file: String) -> StateResult {
             // what we started was the PLC process directly. So,
             // we still need to find the process.
             match find_process_pid(plc_process_name()) {
-                Ok(pid) => {
-                    return Ok(Running(pid))
-                },
-                Err(e) => {
-                    return Err(e.to_string())
-                } 
+                Ok(pid) => return Ok(Running(pid)),
+                Err(e) => return Err(e.to_string()),
             }
-        },
-        Err(e) => {
-            return Err(e.to_string())
         }
+        Err(e) => return Err(e.to_string()),
     }
 }
 
@@ -263,17 +260,13 @@ fn compile_program(file: String) -> StateResult {
             // what we started was the PLC process directly. So,
             // we still need to find the process.
             match find_process_pid(plc_process_name()) {
-                Ok(pid) => {
-                    return Ok(Running(pid))
-                },
-                Err(e) => {
-                    return Err(e.to_string())
-                } 
+                Ok(pid) => return Ok(Running(pid)),
+                Err(e) => return Err(e.to_string()),
             }
-        },
+        }
         Err(e) => {
             println!("Failed to start {}", e);
-            return Err(e.to_string())
+            return Err(e.to_string());
         }
     }
 }
@@ -289,7 +282,7 @@ fn change_hardware(name: String) -> StateResult {
 
     match status {
         Ok(status) => return Ok(Stopped),
-        Err(e) => return Err(e.to_string())
+        Err(e) => return Err(e.to_string()),
     }
 }
 
@@ -303,10 +296,11 @@ async fn run_command(cmd: &str) -> Result<(), Box<dyn std::error::Error>> {
     // the terminal if this process is invoked from the command line).
     cmd.stdout(Stdio::piped());
 
-    let mut child = cmd.spawn()
-        .expect("failed to spawn command");
+    let mut child = cmd.spawn().expect("failed to spawn command");
 
-    let stdout = child.stdout.take()
+    let stdout = child
+        .stdout
+        .take()
         .expect("child did not have a handle to stdout");
 
     let mut reader = BufReader::new(stdout).lines();
@@ -314,7 +308,9 @@ async fn run_command(cmd: &str) -> Result<(), Box<dyn std::error::Error>> {
     // Ensure the child process is spawned in the runtime so it can
     // make progress on its own while we await for any output.
     tokio::spawn(async move {
-        let status = child.wait().await
+        let status = child
+            .wait()
+            .await
             .expect("child process encountered an error");
 
         println!("child status was: {}", status);
@@ -330,20 +326,20 @@ async fn run_command(cmd: &str) -> Result<(), Box<dyn std::error::Error>> {
 // Provides a sharable object that mediates access to the PLC state machine.
 #[derive(Clone)]
 pub struct SharedPlcStateMachine {
-    pub sm: Arc<RwLock<PlcStateMachine>>
+    pub sm: Arc<RwLock<PlcStateMachine>>,
 }
 
 impl SharedPlcStateMachine {
     pub fn new() -> Self {
         use self::*;
         SharedPlcStateMachine {
-            sm: Arc::new(RwLock::new(PlcStateMachine::new()))
+            sm: Arc::new(RwLock::new(PlcStateMachine::new())),
         }
     }
 
     pub async fn transition(&self, event: PlcEvent, timeout: Duration) -> StateResult {
-        use self::PlcState::*;
         use self::PlcEvent::*;
+        use self::PlcState::*;
 
         let poll_end = Instant::now() + timeout;
 
@@ -362,7 +358,7 @@ impl SharedPlcStateMachine {
                     return plc.run(event);
                 }
             }
-            
+
             // If we didn't return, then we are not in the stopped state.
             // Sleep until our next attempt.
             tokio::time::sleep(sleep_for).await;
@@ -377,7 +373,7 @@ impl SharedPlcStateMachine {
             }
         }
 
-        return Err("Timed out waiting to stop".to_string())
+        return Err("Timed out waiting to stop".to_string());
     }
 }
 
@@ -405,4 +401,3 @@ mod tests {
         assert_matches!(sm.state, PlcState::Stopped);
     }
 }
-

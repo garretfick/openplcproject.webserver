@@ -1,15 +1,15 @@
+use rocket::response::Debug;
 use rocket::serde::json::Json;
 use rocket::serde::{Deserialize, Serialize};
-use rocket::response::Debug;
+use rocket::Build;
 
-use super::sqlite::DbConn;
 use super::schema::slave_dev;
+use super::sqlite::DbConn;
 
-use rocket_sync_db_pools::diesel;
 use self::diesel::prelude::*;
+use rocket_sync_db_pools::diesel;
 
 type Result<T, E = Debug<diesel::result::Error>> = std::result::Result<T, E>;
-
 
 #[derive(Deserialize, Serialize)]
 #[serde(crate = "rocket::serde")]
@@ -59,11 +59,8 @@ struct SlaveDev {
 }
 
 #[get("/devices")]
-pub async fn devices(db: DbConn) -> Result<Json<Vec<ModbusDevice>>> {
-    let programs : Vec<SlaveDev> = db.run(move |conn| {
-        slave_dev::table
-            .load(conn)
-    }).await?;
+async fn devices(db: DbConn) -> Result<Json<Vec<ModbusDevice>>> {
+    let programs: Vec<SlaveDev> = db.run(move |conn| slave_dev::table.load(conn)).await?;
 
     let mut counter_di = 0;
     let mut counter_do = 0;
@@ -72,46 +69,29 @@ pub async fn devices(db: DbConn) -> Result<Json<Vec<ModbusDevice>>> {
 
     for program in programs.iter() {
         if program.di_size == 0 {
-            
-        }
-        else {
+        } else {
             counter_di += program.di_size;
         }
 
         if program.coil_size == 0 {
-
-        }
-        else {
+        } else {
             counter_do += program.coil_size;
         }
 
         if program.ir_size + program.hr_read_size == 0 {
-
-        }
-        else {
+        } else {
             counter_ai += program.ir_size + program.hr_read_size;
         }
 
         if program.hr_write_size == 0 {
-
-        }
-        else {
+        } else {
             counter_ao += program.hr_write_size;
         }
     }
 
-    let di = ModbusRegisterDefinition {
-        start: 0,
-        size: 0,
-    };
-    let ai = ModbusRegisterDefinition {
-        start: 0,
-        size: 0,
-    };
-    let ao = ModbusRegisterDefinition {
-        start: 0,
-        size: 0,
-    };
+    let di = ModbusRegisterDefinition { start: 0, size: 0 };
+    let ai = ModbusRegisterDefinition { start: 0, size: 0 };
+    let ao = ModbusRegisterDefinition { start: 0, size: 0 };
 
     let device = ModbusDevice {
         id: String::from("id"),
@@ -128,25 +108,31 @@ pub async fn devices(db: DbConn) -> Result<Json<Vec<ModbusDevice>>> {
 }
 
 #[post("/devices", format = "json", data = "<message>")]
-pub fn add_device(db: DbConn, message: Json<ModbusDevice>) -> Json<ModbusDevice> {
-    return message
+fn add_device(db: DbConn, message: Json<ModbusDevice>) -> Json<ModbusDevice> {
+    return message;
 }
 
 #[delete("/devices/<id>")]
-pub async fn delete_device(db: DbConn, id: i32) -> Result<Option<()>> {
-    let affected = db.run(move |conn| {
-        diesel::delete(slave_dev::table)
-            .filter(slave_dev::dev_id.eq(id))
-            .execute(conn)
-    }).await?;
+async fn delete_device(db: DbConn, id: i32) -> Result<Option<()>> {
+    let affected = db
+        .run(move |conn| {
+            diesel::delete(slave_dev::table)
+                .filter(slave_dev::dev_id.eq(id))
+                .execute(conn)
+        })
+        .await?;
 
     Ok((affected == 1).then(|| ()))
 }
 
 #[get("/ports")]
-pub fn ports() -> std::result::Result<Json<Vec<String>>, String> {
+fn ports() -> std::result::Result<Json<Vec<String>>, String> {
     match serialport::available_ports() {
         Err(e) => Err(String::from("")),
         Ok(ports) => Ok(Json(ports.iter().map(|x| x.port_name.clone()).collect())),
     }
+}
+
+pub fn mount(rocket: rocket::Rocket<Build>) -> rocket::Rocket<Build> {
+    rocket.mount("/", routes![devices, add_device, delete_device, ports,])
 }

@@ -1,6 +1,6 @@
-use rocket::{Rocket, Build};
 use rocket::fairing::AdHoc;
-use rocket_sync_db_pools::{diesel, database};
+use rocket::{Build, Rocket};
+use rocket_sync_db_pools::{database, diesel};
 
 #[database("sqlite_logs")]
 pub struct DbConn(diesel::SqliteConnection);
@@ -12,14 +12,17 @@ async fn run_migrations(rocket: Rocket<Build>) -> Rocket<Build> {
     embed_migrations!("db/migrations");
 
     let conn = DbConn::get_one(&rocket).await.expect("database connection");
-    conn.run(|c| embedded_migrations::run(c)).await.expect("diesel migrations");
+    conn.run(|c| embedded_migrations::run(c))
+        .await
+        .expect("diesel migrations");
 
     rocket
 }
 
 pub fn stage() -> AdHoc {
     AdHoc::on_ignite("Diesel SQLite Stage", |rocket| async {
-        rocket.attach(DbConn::fairing())
+        rocket
+            .attach(DbConn::fairing())
             .attach(AdHoc::on_ignite("Diesel Migrations", run_migrations))
     })
 }

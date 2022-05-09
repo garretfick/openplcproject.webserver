@@ -1,21 +1,25 @@
-#[macro_use] extern crate rocket;
+#[macro_use]
+extern crate rocket;
 // #[macro_use] extern crate rocket_sync_db_pools;
-#[macro_use] extern crate diesel_migrations;
-#[macro_use] extern crate diesel;
-#[macro_use] extern crate matches;
+#[macro_use]
+extern crate diesel_migrations;
+#[macro_use]
+extern crate diesel;
+#[macro_use]
+extern crate matches;
 
-use std::time::Duration;
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::{Header, Status};
-use rocket::{Request, Response, Rocket, Build};
+use rocket::{Build, Request, Response, Rocket};
+use std::time::Duration;
 
 mod devices;
 mod hardware;
 mod plc;
 mod programs;
 mod response;
-mod settings;
 mod schema;
+mod settings;
 mod sqlite;
 mod state;
 mod users;
@@ -74,32 +78,13 @@ pub fn rocket(state: plc::SharedPlcStateMachine) -> Rocket<Build> {
         .attach(sqlite::stage())
         .manage(state);
 
+    rocket = devices::mount(rocket);
+    rocket = hardware::mount(rocket);
     rocket = programs::mount(rocket);
+    rocket = settings::mount(rocket);
+    rocket = state::mount(rocket);
     rocket = users::mount(rocket);
-    rocket.mount(
-            "/",
-            routes![
-                state::state,
-                state::set_state,
-                state::logs,
-                state::compile_logs,
+    rocket = variables::mount(rocket);
 
-                devices::devices,
-                devices::add_device,
-                devices::delete_device,
-                devices::ports,
-
-                variables::variables,
-                variables::patch_variable,
-                
-                hardware::drivers,
-                hardware::select_driver,
-
-                hardware::custom_driver,
-                hardware::set_custom_driver,
-                hardware::reset_custom_driver,
-
-                settings::settings,
-            ],
-    )
+    return rocket;
 }

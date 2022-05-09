@@ -1,5 +1,6 @@
 use rocket::serde::json::Json;
 use rocket::serde::Serialize;
+use rocket::Build;
 
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
@@ -15,16 +16,14 @@ pub struct Settings {
 
     persistent_storage_enabled: bool,
     //persistent_storage_period: Duration,
-
     start_in_run: bool,
-    
     //slave_poll_period: Duration,
     //timeout: Duration,
 }
 
 #[get("/settings")]
-pub fn settings() -> Json<Settings> {
-    Json(Settings{
+fn settings() -> Json<Settings> {
+    Json(Settings {
         modbus_enabled: true,
         modbus_port: 502,
 
@@ -36,11 +35,13 @@ pub fn settings() -> Json<Settings> {
 
         persistent_storage_enabled: false,
         //persistent_storage_period: Duration::seconds(10),
-
         start_in_run: false,
-
         //slave_poll_period: Duration::seconds(10),
 
         //timeout: Duration::milliseconds(1000)
     })
+}
+
+pub fn mount(rocket: rocket::Rocket<Build>) -> rocket::Rocket<Build> {
+    rocket.mount("/", routes![settings])
 }

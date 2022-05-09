@@ -1,8 +1,8 @@
+use diesel::result::Error as DieselError;
 use rocket::http::Status;
-use rocket::response::{status::Created, status::Custom, status::NoContent, status::Accepted};
+use rocket::response::{status::Accepted, status::Created, status::Custom, status::NoContent};
 use rocket::serde::json::Json;
 use rocket::serde::Serialize;
-use diesel::result::Error as DieselError;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(crate = "rocket::serde")]
@@ -30,7 +30,11 @@ impl Error {
         Custom(status, Json(self))
     }
 
-    pub fn response(status: Status, code: &'static str, title: &'static str) -> Custom<Json<Error>> {
+    pub fn response(
+        status: Status,
+        code: &'static str,
+        title: &'static str,
+    ) -> Custom<Json<Error>> {
         Custom(status, Json(Error::new(code, title)))
     }
 }

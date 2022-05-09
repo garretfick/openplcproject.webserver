@@ -1,17 +1,17 @@
-use std::time::Duration;
-use rocket::{Build, State};
+use rocket::http::Status;
+use rocket::response::{status::Accepted, status::Created, status::NoContent, Debug};
 use rocket::serde::json::Json;
 use rocket::serde::{Deserialize, Serialize};
-use rocket::response::{Debug, status::Created, status::NoContent, status::Accepted};
-use rocket::http::Status;
+use rocket::{Build, State};
+use std::time::Duration;
 
 use super::plc;
-use super::sqlite::DbConn;
-use super::schema::programs;
 use super::response::*;
+use super::schema::programs;
+use super::sqlite::DbConn;
 
-use rocket_sync_db_pools::diesel;
 use self::diesel::prelude::*;
+use rocket_sync_db_pools::diesel;
 
 type Result<T, E = Debug<diesel::result::Error>> = std::result::Result<T, E>;
 
@@ -28,7 +28,7 @@ pub struct InsertableProgram {
 
 #[derive(Debug, Clone, Serialize, Queryable, Insertable)]
 #[serde(crate = "rocket::serde")]
-#[table_name="programs"]
+#[table_name = "programs"]
 pub struct Program {
     #[serde(skip_deserializing)]
     #[serde(rename = "id")]
@@ -56,52 +56,48 @@ impl Program {
         }
     }
 
-    async fn create(db: DbConn, program: Program)  -> Result<Program, diesel::result::Error> {
+    async fn create(db: DbConn, program: Program) -> Result<Program, diesel::result::Error> {
         db.run(move |conn| {
             match diesel::insert_into(programs::table)
                 .values(&program)
-                .execute(conn) {
-                    Ok(_) => {
-                        programs::table
-                            .filter(programs::name.eq(program.name))
-                            .limit(1)
-                            .first::<Program>(conn)
-                    },
-                    Err(e) => Err(e),
-                }
-        }).await
+                .execute(conn)
+            {
+                Ok(_) => programs::table
+                    .filter(programs::name.eq(program.name))
+                    .limit(1)
+                    .first::<Program>(conn),
+                Err(e) => Err(e),
+            }
+        })
+        .await
     }
 
     async fn get(db: DbConn, id: i32) -> Result<Program, diesel::result::Error> {
-        db.run(move |conn| {
-            programs::table
-                .find(id)
-                .first::<Program>(conn)
-        }).await
+        db.run(move |conn| programs::table.find(id).first::<Program>(conn))
+            .await
     }
 
     async fn all(db: DbConn) -> Result<Vec<Program>, diesel::result::Error> {
-        db.run(move |conn| {
-            programs::table
-                .load(conn)
-        }).await
+        db.run(move |conn| programs::table.load(conn)).await
     }
 
     async fn delete(db: DbConn, id: i32) -> Result<i32, diesel::result::Error> {
         db.run(move |conn| {
             match diesel::delete(programs::table)
                 .filter(programs::prog_id.eq(id))
-                .execute(conn)  {
-                    Ok(a) => {
-                        if a == 1 {
-                            Ok(id)
-                        } else {
-                            Err(diesel::result::Error::NotFound)
-                        }
-                    },
-                    Err(e) => Err(e),
+                .execute(conn)
+            {
+                Ok(a) => {
+                    if a == 1 {
+                        Ok(id)
+                    } else {
+                        Err(diesel::result::Error::NotFound)
+                    }
                 }
-        }).await
+                Err(e) => Err(e),
+            }
+        })
+        .await
     }
 }
 
@@ -131,7 +127,11 @@ async fn delete_program(db: DbConn, id: i32) -> NoContentResponse {
 }
 
 #[put("/programs/<id>/actions/compile")]
-async fn compile_program(plc: &State<plc::SharedPlcStateMachine>, db: DbConn, id: i32) -> AcceptedResponse {
+async fn compile_program(
+    plc: &State<plc::SharedPlcStateMachine>,
+    db: DbConn,
+    id: i32,
+) -> AcceptedResponse {
     let program = Program::get(db, id)
         .await
         // TODO this should be an error
@@ -145,20 +145,21 @@ async fn compile_program(plc: &State<plc::SharedPlcStateMachine>, db: DbConn, id
 }
 
 pub fn mount(rocket: rocket::Rocket<Build>) -> rocket::Rocket<Build> {
-    rocket.mount("/",
+    rocket.mount(
+        "/",
         routes![
             get_programs,
             create_program,
             delete_program,
             compile_program,
-        ]
+        ],
     )
 }
 
 #[cfg(test)]
 mod test {
-    use super::super::rocket;
     use super::super::plc::SharedPlcStateMachine;
+    use super::super::rocket;
     //use super::main::rocket;
     use rocket::http::Status;
     use rocket::local::blocking::Client;

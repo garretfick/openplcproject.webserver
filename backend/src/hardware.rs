@@ -1,12 +1,12 @@
-use std::time::Duration;
-use rocket::State;
-use rocket::response::{status::Accepted};
+use rocket::http::Status;
+use rocket::response::status::Accepted;
 use rocket::serde::json::Json;
 use rocket::serde::{Deserialize, Serialize};
-use rocket::http::Status;
+use rocket::{Build, State};
+use std::time::Duration;
 
-use super::response::*;
 use super::plc;
+use super::response::*;
 
 const NUM_DRIVERS: usize = 12;
 
@@ -88,7 +88,7 @@ const DRIVERS: [Driver; NUM_DRIVERS] = [
 ];
 
 #[get("/drivers")]
-pub fn drivers() -> Json<Drivers> {
+fn drivers() -> Json<Drivers> {
     let drivers = Drivers {
         items: DRIVERS,
         selected: String::from("none"),
@@ -98,9 +98,12 @@ pub fn drivers() -> Json<Drivers> {
 }
 
 #[post("/drivers?<selected>")]
-pub async fn select_driver(plc: &State<plc::SharedPlcStateMachine>, selected: String) -> AcceptedResponse {
+async fn select_driver(
+    plc: &State<plc::SharedPlcStateMachine>,
+    selected: String,
+) -> AcceptedResponse {
     let event = plc::PlcEvent::SetHardware(selected);
-    
+
     plc.transition(event, Duration::from_secs(2))
         .await
         .map(|state| Ok(Accepted::<()>(None)))
@@ -108,25 +111,38 @@ pub async fn select_driver(plc: &State<plc::SharedPlcStateMachine>, selected: St
 }
 
 #[get("/customDriver")]
-pub fn custom_driver() -> Json<Code> {
+fn custom_driver() -> Json<Code> {
     let code = Code {
         data: String::from("ok"),
     };
-    return Json(code);    
+    return Json(code);
 }
 
-#[put("/customDriver", format="json", data = "<message>")]
-pub fn set_custom_driver(message: Json<Code>) -> Json<Code> {
+#[put("/customDriver", format = "json", data = "<message>")]
+fn set_custom_driver(message: Json<Code>) -> Json<Code> {
     let code = Code {
         data: String::from("ok"),
     };
-    return Json(code);    
+    return Json(code);
 }
 
 #[put("/customDriver/actions/reset")]
-pub fn reset_custom_driver() -> Json<Code> {
+fn reset_custom_driver() -> Json<Code> {
     let code = Code {
         data: String::from("ok"),
     };
-    return Json(code); 
+    return Json(code);
+}
+
+pub fn mount(rocket: rocket::Rocket<Build>) -> rocket::Rocket<Build> {
+    rocket.mount(
+        "/",
+        routes![
+            drivers,
+            select_driver,
+            custom_driver,
+            set_custom_driver,
+            reset_custom_driver,
+        ],
+    )
 }

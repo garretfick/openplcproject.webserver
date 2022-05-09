@@ -1,19 +1,19 @@
-use rocket::Build;
+use rocket::http::Status;
+use rocket::response::{status::Created, status::NoContent};
 use rocket::serde::json::Json;
 use rocket::serde::{Deserialize, Serialize};
-use rocket::response::{status::Created, status::NoContent};
-use rocket::http::Status;
+use rocket::Build;
 
-use super::sqlite::DbConn;
-use super::schema::users;
 use super::response::*;
+use super::schema::users;
+use super::sqlite::DbConn;
 
-use rocket_sync_db_pools::diesel;
 use self::diesel::prelude::*;
+use rocket_sync_db_pools::diesel;
 
 #[derive(Debug, Clone, Deserialize, Serialize, Queryable, Insertable, AsChangeset)]
 #[serde(crate = "rocket::serde")]
-#[table_name="users"]
+#[table_name = "users"]
 pub struct User {
     #[serde(skip_deserializing)]
     #[serde(rename = "id")]
@@ -25,56 +25,54 @@ pub struct User {
 }
 
 impl User {
-  async fn create(db: DbConn, user: User) -> Result<User, diesel::result::Error> {
-        db.run(move |conn| {
-            match diesel::insert_into(users::table)
-                .values(user)
-                .execute(conn) {
-                    Ok(_u) => {
-                        users::table
-                            .order(users::user_id.desc())
-                            .first::<User>(conn)
-                    },
-                    Err(e) => Err(e),
-                }
-        }).await
+    async fn create(db: DbConn, user: User) -> Result<User, diesel::result::Error> {
+        db.run(
+            move |conn| match diesel::insert_into(users::table).values(user).execute(conn) {
+                Ok(_u) => users::table
+                    .order(users::user_id.desc())
+                    .first::<User>(conn),
+                Err(e) => Err(e),
+            },
+        )
+        .await
     }
 
     async fn all(db: DbConn) -> Result<Vec<User>, diesel::result::Error> {
-        db.run(move |conn| {
-            users::table
-                .load(conn)
-        }).await
+        db.run(move |conn| users::table.load(conn)).await
     }
 
     async fn update(db: DbConn, id: i32, user: User) -> Result<User, diesel::result::Error> {
         db.run(move |conn| {
-            match diesel::update(users::table.find(id)).set(user).execute(conn) {
-                Ok(u) => {
-                    users::table
-                        .order(users::user_id.desc())
-                        .first::<User>(conn)
-                },
+            match diesel::update(users::table.find(id))
+                .set(user)
+                .execute(conn)
+            {
+                Ok(u) => users::table
+                    .order(users::user_id.desc())
+                    .first::<User>(conn),
                 Err(e) => Err(e),
             }
-        }).await
+        })
+        .await
     }
 
     async fn delete(db: DbConn, id: i32) -> Result<i32, diesel::result::Error> {
         db.run(move |conn| {
             match diesel::delete(users::table)
                 .filter(users::user_id.eq(id))
-                .execute(conn) {
-                    Ok(a) => {
-                        if a == 1 {
-                            Ok(id)
-                        } else {
-                            Err(diesel::result::Error::NotFound)
-                        }
-                    },
-                    Err(e) => Err(e),
+                .execute(conn)
+            {
+                Ok(a) => {
+                    if a == 1 {
+                        Ok(id)
+                    } else {
+                        Err(diesel::result::Error::NotFound)
+                    }
                 }
-        }).await
+                Err(e) => Err(e),
+            }
+        })
+        .await
     }
 }
 
@@ -111,12 +109,8 @@ async fn delete_user(db: DbConn, id: i32) -> NoContentResponse {
 }
 
 pub fn mount(rocket: rocket::Rocket<Build>) -> rocket::Rocket<Build> {
-    rocket.mount("/",
-        routes![
-            get_users,
-            create_user,
-            patch_user,
-            delete_user,
-        ]
+    rocket.mount(
+        "/",
+        routes![get_users, create_user, patch_user, delete_user,],
     )
 }

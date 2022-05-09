@@ -1,5 +1,6 @@
 use rocket::serde::json::Json;
 use rocket::serde::{Deserialize, Serialize};
+use rocket::Build;
 
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
@@ -9,17 +10,17 @@ pub struct Variable {
     forced: bool,
     value: String,
     #[serde(alias = "typeName")]
-    type_name: String
+    type_name: String,
 }
 
 #[derive(Deserialize)]
 #[serde(crate = "rocket::serde")]
 pub struct PatchVariable {
-    value: String
+    value: String,
 }
 
 #[get("/variables")]
-pub fn variables() -> Json<Vec<Variable>> {
+fn variables() -> Json<Vec<Variable>> {
     let variable = Variable {
         name: String::from("world"),
         location: String::from("loc"),
@@ -35,7 +36,11 @@ pub fn variables() -> Json<Vec<Variable>> {
 }
 
 #[patch("/variables/<id>", format = "json", data = "<variable>")]
-pub fn patch_variable(id: String, variable: Json<PatchVariable>) -> String {
+fn patch_variable(id: String, variable: Json<PatchVariable>) -> String {
     let resp = String::from("{}");
     return resp;
+}
+
+pub fn mount(rocket: rocket::Rocket<Build>) -> rocket::Rocket<Build> {
+    rocket.mount("/", routes![variables, patch_variable,])
 }

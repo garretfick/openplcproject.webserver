@@ -1,7 +1,7 @@
-use rocket::State;
+use rocket::http::Status;
 use rocket::serde::json::Json;
 use rocket::serde::{Deserialize, Serialize};
-use rocket::http::Status;
+use rocket::{Build, State};
 
 use super::plc;
 use super::response::*;
@@ -59,14 +59,17 @@ pub fn state(plc: &State<plc::SharedPlcStateMachine>) -> OkResponse<StateInfo> {
                 hostname: String::from("localhost"),
                 uptime: String::from("f"),
                 state: AppState::STOPPED,
-            }))
-        },
+            }));
+        }
         Err(e) => return Err(Error::response(Status::ImATeapot, "", "")),
     }
 }
 
 #[put("/state", format = "json", data = "<message>")]
-pub fn set_state(plc: &State<plc::SharedPlcStateMachine>, message: Json<StateRequest>) -> OkResponse<StateInfo> {
+pub fn set_state(
+    plc: &State<plc::SharedPlcStateMachine>,
+    message: Json<StateRequest>,
+) -> OkResponse<StateInfo> {
     // TODO this needs stuff
     Ok(Json(StateInfo {
         name: String::from("world"),
@@ -90,4 +93,8 @@ pub fn compile_logs() -> Json<Logs> {
     Json(Logs {
         data: String::from("logs content"),
     })
+}
+
+pub fn mount(rocket: rocket::Rocket<Build>) -> rocket::Rocket<Build> {
+    rocket.mount("/", routes![state, set_state, logs, compile_logs,])
 }
