@@ -2,8 +2,6 @@ use rocket::{Rocket, Build};
 use rocket::fairing::AdHoc;
 use rocket_sync_db_pools::{diesel, database};
 
-// use self::diesel::prelude::*;
-
 #[database("sqlite_logs")]
 pub struct DbConn(diesel::SqliteConnection);
 

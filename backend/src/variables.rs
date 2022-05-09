@@ -34,8 +34,8 @@ pub fn variables() -> Json<Vec<Variable>> {
     Json(vec)
 }
 
-#[patch("/variables/<id>", format = "json", data = "<message>")]
-pub fn patch_variable(id: String, message: Json<PatchVariable>) -> String {
+#[patch("/variables/<id>", format = "json", data = "<variable>")]
+pub fn patch_variable(id: String, variable: Json<PatchVariable>) -> String {
     let resp = String::from("{}");
     return resp;
 }

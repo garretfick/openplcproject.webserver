@@ -56,7 +56,7 @@ function Users() {
                     />
                     <DeleteButton
                         itemName={item.username}
-                        itemId={item.user_id.toString()}
+                        itemId={item.id.toString()}
                         confirmTitle="Delete User"
                         confirmText="Are you sure you want to delete?"
                         onDelete={handleDelete}

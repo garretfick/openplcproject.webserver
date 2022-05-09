@@ -1,5 +1,12 @@
+use std::time::Duration;
+use rocket::State;
+use rocket::response::{status::Accepted};
 use rocket::serde::json::Json;
 use rocket::serde::{Deserialize, Serialize};
+use rocket::http::Status;
+
+use super::response::*;
+use super::plc;
 
 const NUM_DRIVERS: usize = 12;
 
@@ -91,8 +98,13 @@ pub fn drivers() -> Json<Drivers> {
 }
 
 #[post("/drivers?<selected>")]
-pub fn select_driver(selected: String) -> String {
-    return String::from("ok");
+pub async fn select_driver(plc: &State<plc::SharedPlcStateMachine>, selected: String) -> AcceptedResponse {
+    let event = plc::PlcEvent::SetHardware(selected);
+    
+    plc.transition(event, Duration::from_secs(2))
+        .await
+        .map(|state| Ok(Accepted::<()>(None)))
+        .map_err(|e| Error::response(Status::ImATeapot, "", ""))?
 }
 
 #[get("/customDriver")]

@@ -1,13 +1,15 @@
+use rocket::Build;
 use rocket::serde::json::Json;
 use rocket::serde::{Deserialize, Serialize};
-use rocket::response::{Debug, status::Created};
+use rocket::response::{status::Created, status::NoContent};
+use rocket::http::Status;
 
 use super::sqlite::DbConn;
+use super::schema::users;
+use super::response::*;
 
 use rocket_sync_db_pools::diesel;
 use self::diesel::prelude::*;
-
-type Result<T, E = Debug<diesel::result::Error>> = std::result::Result<T, E>;
 
 #[derive(Debug, Clone, Deserialize, Serialize, Queryable, Insertable, AsChangeset)]
 #[serde(crate = "rocket::serde")]
@@ -22,57 +24,99 @@ pub struct User {
     password: String,
 }
 
-table! {
-    users (user_id) {
-        user_id -> Nullable<Integer>,
-        name -> Text,
-        username -> Text,
-        email -> Text,
-        password -> Text,
+impl User {
+  async fn create(db: DbConn, user: User) -> Result<User, diesel::result::Error> {
+        db.run(move |conn| {
+            match diesel::insert_into(users::table)
+                .values(user)
+                .execute(conn) {
+                    Ok(_u) => {
+                        users::table
+                            .order(users::user_id.desc())
+                            .first::<User>(conn)
+                    },
+                    Err(e) => Err(e),
+                }
+        }).await
+    }
+
+    async fn all(db: DbConn) -> Result<Vec<User>, diesel::result::Error> {
+        db.run(move |conn| {
+            users::table
+                .load(conn)
+        }).await
+    }
+
+    async fn update(db: DbConn, id: i32, user: User) -> Result<User, diesel::result::Error> {
+        db.run(move |conn| {
+            match diesel::update(users::table.find(id)).set(user).execute(conn) {
+                Ok(u) => {
+                    users::table
+                        .order(users::user_id.desc())
+                        .first::<User>(conn)
+                },
+                Err(e) => Err(e),
+            }
+        }).await
+    }
+
+    async fn delete(db: DbConn, id: i32) -> Result<i32, diesel::result::Error> {
+        db.run(move |conn| {
+            match diesel::delete(users::table)
+                .filter(users::user_id.eq(id))
+                .execute(conn) {
+                    Ok(a) => {
+                        if a == 1 {
+                            Ok(id)
+                        } else {
+                            Err(diesel::result::Error::NotFound)
+                        }
+                    },
+                    Err(e) => Err(e),
+                }
+        }).await
     }
 }
 
 #[get("/users")]
-pub async fn get_users(db: DbConn) -> Result<Json<Vec<User>>> {
-    let users: Vec<User> = db.run(move |conn| {
-        users::table
-            .load(conn)
-    }).await?;
-
-    Ok(Json(users))
+async fn get_users(db: DbConn) -> OkResponse<Vec<User>> {
+    User::all(db)
+        .await
+        .map(|users| Ok(Json(users)))
+        .map_err(|e| Error::from(e).to_response(Status::ImATeapot))?
 }
 
 #[post("/users", format = "json", data = "<user>")]
-pub async fn create_user(db: DbConn, user: Json<User>) -> Result<Created<Json<User>>> {
-    let user_value = user.clone();
-    db.run(move |conn| {
-        diesel::insert_into(users::table)
-            .values(user_value)
-            .execute(conn)
-    }).await?;
-
-    Ok(Created::new("/").body(user))
+async fn create_user(db: DbConn, user: Json<User>) -> CreatedResponse<User> {
+    User::create(db, user.into_inner())
+        .await
+        .map(|user| Ok(Created::new("/").body(Json(user))))
+        .map_err(|e| Error::from(e).to_response(Status::ImATeapot))?
 }
 
 #[patch("/users/<id>", format = "json", data = "<user>")]
-pub async fn patch_user(db: DbConn, id: i32, user: Json<User>) -> Result<Json<User>> {
-    let user_value = user.clone();
-    db.run(move |conn| {
-        diesel::update(users::table.find(id))
-            .set(user_value)
-            .execute(conn)
-    }).await?;
-
-    Ok(user)
+async fn patch_user(db: DbConn, id: i32, user: Json<User>) -> OkResponse<User> {
+    User::update(db, id, user.into_inner())
+        .await
+        .map(|user| Ok(Json(user)))
+        .map_err(|e| Error::from(e).to_response(Status::ImATeapot))?
 }
 
 #[delete("/users/<id>")]
-pub async fn delete_user(db: DbConn, id: i32) -> Result<Option<()>> {
-    let affected = db.run(move |conn| {
-        diesel::delete(users::table)
-            .filter(users::user_id.eq(id))
-            .execute(conn)
-    }).await?;
+async fn delete_user(db: DbConn, id: i32) -> NoContentResponse {
+    User::delete(db, id)
+        .await
+        .map(|_d| Ok(NoContent))
+        .map_err(|e| Error::from(e).to_response(Status::ImATeapot))?
+}
 
-    Ok((affected == 1).then(|| ()))
+pub fn mount(rocket: rocket::Rocket<Build>) -> rocket::Rocket<Build> {
+    rocket.mount("/",
+        routes![
+            get_users,
+            create_user,
+            patch_user,
+            delete_user,
+        ]
+    )
 }

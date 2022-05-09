@@ -1,5 +1,10 @@
+use rocket::State;
 use rocket::serde::json::Json;
 use rocket::serde::{Deserialize, Serialize};
+use rocket::http::Status;
+
+use super::plc;
+use super::response::*;
 
 // We control state as a finite state machine.
 // The state functions allow direct control of the
@@ -11,7 +16,7 @@ use rocket::serde::{Deserialize, Serialize};
 // state.
 #[derive(Deserialize, Serialize, Copy, Clone)]
 #[serde(crate = "rocket::serde")]
-pub enum State {
+pub enum AppState {
     RUNNING,
     COMPILING,
     STOPPED,
@@ -26,14 +31,14 @@ pub struct StateInfo {
     path: String,
     hostname: String,
     uptime: String,
-    state: State,
+    state: AppState,
 }
 
 #[derive(Deserialize)]
 #[serde(crate = "rocket::serde")]
 pub struct StateRequest {
     message: String,
-    state: State,
+    state: AppState,
 }
 
 #[derive(Serialize)]
@@ -43,27 +48,34 @@ pub struct Logs {
 }
 
 #[get("/state")]
-pub fn state() -> Json<StateInfo> {
-    Json(StateInfo {
-        name: String::from("world"),
-        description: String::from("hello"),
-        path: String::from("file_name"),
-        hostname: String::from("localhost"),
-        uptime: String::from("f"),
-        state: State::STOPPED,
-    })
+pub fn state(plc: &State<plc::SharedPlcStateMachine>) -> OkResponse<StateInfo> {
+    match plc.sm.read() {
+        Ok(plc) => {
+            // TODO something meaningful here
+            return Ok(Json(StateInfo {
+                name: String::from("world"),
+                description: String::from("hello"),
+                path: String::from("file_name"),
+                hostname: String::from("localhost"),
+                uptime: String::from("f"),
+                state: AppState::STOPPED,
+            }))
+        },
+        Err(e) => return Err(Error::response(Status::ImATeapot, "", "")),
+    }
 }
 
 #[put("/state", format = "json", data = "<message>")]
-pub fn set_state(message: Json<StateRequest>) -> Json<StateInfo> {
-    Json(StateInfo {
+pub fn set_state(plc: &State<plc::SharedPlcStateMachine>, message: Json<StateRequest>) -> OkResponse<StateInfo> {
+    // TODO this needs stuff
+    Ok(Json(StateInfo {
         name: String::from("world"),
         description: String::from("hello"),
         path: String::from("file_name"),
         hostname: String::from("localhost"),
         uptime: String::from("f"),
         state: message.state,
-    })
+    }))
 }
 
 #[get("/logs")]

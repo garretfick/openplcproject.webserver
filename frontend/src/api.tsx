@@ -125,12 +125,12 @@ const updateState = async (state: StateRequest) => {
 };
 
 const fetchPrograms = async () => {
-    return get<{ id: string; name: string; created_at: string }[]>('programs').then((data) => {
+    return get<{ id: string; name: string; fileName: string; createdAt: number }[]>('programs').then((data) => {
         return data.map((item) => {
-            const created_at = new Date(item.created_at);
+            const createdAt = new Date(item.createdAt);
             return {
                 ...item,
-                created_at,
+                createdAt,
             } as Program;
         });
     });

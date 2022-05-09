@@ -3,7 +3,7 @@ export interface Program {
     name: string;
     description: string;
     fileName: string;
-    created_at: Date;
+    createdAt: Date;
 }
 
 export interface NewProgram {

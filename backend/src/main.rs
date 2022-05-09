@@ -2,15 +2,20 @@
 // #[macro_use] extern crate rocket_sync_db_pools;
 #[macro_use] extern crate diesel_migrations;
 #[macro_use] extern crate diesel;
+#[macro_use] extern crate matches;
 
+use std::time::Duration;
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::{Header, Status};
-use rocket::{Request, Response};
+use rocket::{Request, Response, Rocket, Build};
 
 mod devices;
 mod hardware;
+mod plc;
 mod programs;
+mod response;
 mod settings;
+mod schema;
 mod sqlite;
 mod state;
 mod users;
@@ -40,11 +45,38 @@ impl Fairing for CORS {
 }
 
 #[launch]
-fn rocket() -> _ {
-    rocket::build()
+pub fn launch() -> _ {
+    // Create the shared state. We need this protected a mutex
+    // because both requests and our background process will need
+    // to access the state.
+    let state = plc::SharedPlcStateMachine::new();
+
+    let clone = state.clone();
+    tokio::spawn(async move {
+        // Every one second we will recheck the state by passing the
+        // NoOp event.
+        let mut interval = tokio::time::interval(Duration::from_secs(5));
+        loop {
+            {
+                let mut x = clone.sm.write().unwrap();
+                x.run(plc::PlcEvent::NoOp);
+            }
+            interval.tick().await;
+        }
+    });
+
+    rocket(state)
+}
+
+pub fn rocket(state: plc::SharedPlcStateMachine) -> Rocket<Build> {
+    let mut rocket = rocket::build()
         .attach(CORS)
         .attach(sqlite::stage())
-        .mount(
+        .manage(state);
+
+    rocket = programs::mount(rocket);
+    rocket = users::mount(rocket);
+    rocket.mount(
             "/",
             routes![
                 state::state,
@@ -52,13 +84,9 @@ fn rocket() -> _ {
                 state::logs,
                 state::compile_logs,
 
-                programs::get_programs,
-                programs::create_program,
-                programs::delete_program,
-                programs::compile_program,
-
                 devices::devices,
                 devices::add_device,
+                devices::delete_device,
                 devices::ports,
 
                 variables::variables,
@@ -70,11 +98,6 @@ fn rocket() -> _ {
                 hardware::custom_driver,
                 hardware::set_custom_driver,
                 hardware::reset_custom_driver,
-
-                users::get_users,
-                users::create_user,
-                users::patch_user,
-                users::delete_user,
 
                 settings::settings,
             ],

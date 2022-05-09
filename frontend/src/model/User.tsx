@@ -1,7 +1,7 @@
 export interface User {
     // TODO encoding as a number is not idea - rounding errors
     // are at least possible
-    user_id: number;
+    id: number;
     name: string;
     username: string;
     email: string;

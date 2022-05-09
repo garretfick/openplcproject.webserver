@@ -26,7 +26,7 @@ function HardwareLayerControl(props: HardwareLayerControlProps) {
 
     return (
         <Flex as="div" align="center" justify="space-between" w="full" px="4" h="14">
-            <Select display={{ base: 'none', md: 'flex' }} onChange={handleInputChange} defaultValue={driver}>
+            <Select onChange={handleInputChange} defaultValue={driver}>
                 {options}
             </Select>
             <Flex align="center">

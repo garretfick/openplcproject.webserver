@@ -34,9 +34,9 @@ function Programs() {
     const programs = data?.map((item) => {
         return (
             <Tr key={item.id}>
-                <Td>{item.id}</Td>
                 <Td>{item.name}</Td>
-                <Td isNumeric>{item.created_at.toLocaleString()}</Td>
+                <Td>{item.fileName}</Td>
+                <Td isNumeric>{item.createdAt.toLocaleString()}</Td>
                 <Td>
                     <ActionButton
                         icon={<RepeatIcon />}
